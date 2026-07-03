@@ -4,11 +4,12 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: './', // Ensure relative asset loading for GitHub Pages, Surge, and Render
   plugins: [react(), tailwindcss()],
   server: {
-    host: '0.0.0.0', // Expose to local network
+    host: '0.0.0.0',
     port: 5173,
-    allowedHosts: true, // Allow all external hosts (Localtunnel, Render, Ngrok)
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
