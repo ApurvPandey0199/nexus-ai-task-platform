@@ -1,8 +1,3 @@
-# ============================================================================
-# Render.com Infrastructure Blueprint (render.yaml)
-# Full-Stack Web Service Deployment: React Frontend + Express API + DB
-# ============================================================================
-
 services:
   - type: web
     name: nexus-ai-task-platform
@@ -10,7 +5,7 @@ services:
     region: singapore
     plan: free
     buildCommand: npm install && npm run build
-    startCommand: npm run server
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
