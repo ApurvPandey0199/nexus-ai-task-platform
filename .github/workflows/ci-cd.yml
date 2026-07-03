@@ -1,0 +1,98 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: TypeScript Type Check
+        run: npx tsc --noEmit
+
+      - name: Build Frontend Bundle
+        run: npm run build
+
+  build-and-push-docker:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Metadata (Tags, Labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/nexus-ai/platform
+
+      - name: Build & Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: true
+          tags: ghcr.io/nexus-ai/frontend:${{ github.sha }},ghcr.io/nexus-ai/frontend:latest
+
+      - name: Build & Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.backend
+          push: true
+          tags: ghcr.io/nexus-ai/backend:${{ github.sha }},ghcr.io/nexus-ai/backend:latest
+
+      - name: Build & Push Python Worker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.worker
+          push: true
+          tags: ghcr.io/nexus-ai/worker:${{ github.sha }},ghcr.io/nexus-ai/worker:latest
+
+  update-gitops-manifests:
+    needs: build-and-push-docker
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout Infra Repository
+        uses: actions/checkout@v4
+        with:
+          repository: 'nexus-ai/platform-infra'
+          token: ${{ secrets.GITOPS_PAT }}
+
+      - name: Update Image Tags in K8s Manifests
+        run: |
+          sed -i 's|image: ghcr.io/nexus-ai/frontend:.*|image: ghcr.io/nexus-ai/frontend:${{ github.sha }}|g' k8s/deployment-frontend.yaml
+          sed -i 's|image: ghcr.io/nexus-ai/backend:.*|image: ghcr.io/nexus-ai/backend:${{ github.sha }}|g' k8s/deployment-backend.yaml
+          sed -i 's|image: ghcr.io/nexus-ai/worker:.*|image: ghcr.io/nexus-ai/worker:${{ github.sha }}|g' k8s/deployment-worker.yaml
+
+      - name: Commit and Push Image Tag Bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(deps): bump container image tags to ${{ github.sha }}"
+          git push origin main
