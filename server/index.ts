@@ -300,21 +300,46 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-// Serve static distribution files if available (Single Unified App Host)
+// Serve static distribution files (Single Unified App Host)
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-const distPath = path.resolve(process.cwd(), 'dist');
-if (fs.existsSync(distPath)) {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const possibleDistPaths = [
+  path.resolve(process.cwd(), 'dist'),
+  path.resolve(__dirname, '../dist'),
+  path.resolve(__dirname, '../../dist'),
+];
+
+let distPath = possibleDistPaths.find(p => fs.existsSync(p));
+
+if (distPath && fs.existsSync(path.join(distPath, 'index.html'))) {
+  console.log(`[Unified Server] Serving static production frontend from: ${distPath}`);
   app.use(express.static(distPath));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.resolve(distPath, 'index.html'));
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  console.warn('[Unified Server] Warning: dist/index.html not found. Serving embedded HTML fallback.');
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.send(`<!DOCTYPE html>
+<html>
+<head><title>NexusAI Platform</title></head>
+<body style="background:#090d16;color:#fff;font-family:sans-serif;text-align:center;padding:50px;">
+  <h2>NexusAI Platform Server Running</h2>
+  <p>Status: Healthy | API Active at <a href="/api/health" style="color:#38bdf8">/api/health</a></p>
+</body>
+</html>`);
   });
 }
 
 // Start Express Server (Host 0.0.0.0 for Network & Cloud deployment)
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`[Unified Full-Stack Server] Express API + React App running on http://0.0.0.0:${PORT}`);
 });
 
