@@ -1,0 +1,10 @@
+# ============================================================================
+# Dockerfile: Python Asynchronous Task Worker
+# ============================================================================
+
+FROM python:3.11-slim
+WORKDIR /app
+COPY python_worker/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+COPY python_worker/ ./python_worker/
+CMD ["python", "python_worker/worker.py"]

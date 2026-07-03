@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  # 1. Redis Task Queue Broker
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis-queue
+    ports:
+      - "6379:6379"
+    restart: always
+
+  # 2. Node/Express REST API Server & TanStack Backend
+  api-server:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: nexus-api-server
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=nexus_ai_super_secret_jwt_key_2026
+    depends_on:
+      - redis
+
+  # 3. Python Async Task Worker Daemon
+  python-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: nexus-python-worker
+    environment:
+      - API_BASE_URL=http://api-server:3001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+      - api-server

@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  # 1. Redis Task Queue Broker
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - nexus-network
+
+  # 2. Node/Express Backend REST API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: nexus-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=nexus_ai_secure_jwt_secret_key_2026_prod
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+
+  # 3. Python Async Worker Daemon
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: nexus-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - API_URL=http://backend:3001
+      - WORKER_CONCURRENCY=5
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - nexus-network
+
+  # 4. React Frontend Web App
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: nexus-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - nexus-network
+
+networks:
+  nexus-network:
+    driver: bridge

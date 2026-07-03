@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-frontend
+  namespace: nexus-ai
+  labels:
+    app: nexus-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nexus-frontend
+  template:
+    metadata:
+      labels:
+        app: nexus-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/nexus-ai/frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nexus-frontend-service
+  namespace: nexus-ai
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: nexus-frontend
