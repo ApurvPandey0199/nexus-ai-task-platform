@@ -1,0 +1,24 @@
+# ============================================================================
+# Render.com Infrastructure Blueprint (render.yaml)
+# Full-Stack Web Service Deployment: React Frontend + Express API + DB
+# ============================================================================
+
+services:
+  - type: web
+    name: nexus-ai-task-platform
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REDIS_HOST
+        value: localhost
+      - key: REDIS_PORT
+        value: 6379
